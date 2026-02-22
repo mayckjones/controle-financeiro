@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle Financeiro Mensal</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14; --surface: #161922; --surface2: #1e2330; --border: #2a3040;
+    --red: #e84545; --orange: #f07c3a; --green: #2ecc71;
+    --green-dim: #1a4a35; --red-dim: #4a1a1a; --orange-dim: #4a2a10;
+    --text: #e8eaf0; --muted: #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  #loadingOverlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 999; gap: 1rem; transition: opacity 0.4s;
+  }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.2rem 2rem; display: flex; align-items: center; gap: 1rem; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+  .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--red), var(--orange)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+  header h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.5px; }
+  header h1 span { color: var(--orange); }
+
+  .sync-badge { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .sync-dot.syncing { background: var(--orange); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .month-nav { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+  .month-nav button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background 0.2s; }
+  .month-nav button:hover { background: var(--border); }
+  .month-nav span { font-family: 'Syne', sans-serif; font-weight: 700; min-width: 130px; text-align: center; font-size: 0.95rem; }
+
+  .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; }
+  .card-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 0.5rem; }
+  .card-value { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; }
+  .card-value.green { color: var(--green); } .card-value.red { color: var(--red); } .card-value.orange { color: var(--orange); }
+  .card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+
+  .receita-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .receita-section label { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; white-space: nowrap; color: var(--green); }
+
+  .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem; }
+  .form-card h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 1.2rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 0.8rem; align-items: end; }
+  .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .form-group label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 0.65rem 0.9rem; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; outline: none; transition: border-color 0.2s; width: 100%; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--orange); }
+
+  .tipo-toggle { display: flex; gap: 0.5rem; }
+  .tipo-btn { flex: 1; padding: 0.65rem; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; text-align: center; }
+  .tipo-btn.active-fixed { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .tipo-btn.active-variable { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
+
+  .btn-add { background: linear-gradient(135deg, var(--red), var(--orange)); border: none; border-radius: 10px; color: white; padding: 0.65rem 1.4rem; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; cursor: pointer; white-space: nowrap; transition: opacity 0.2s, transform 0.1s; }
+  .btn-add:hover { opacity: 0.85; } .btn-add:active { transform: scale(0.97); } .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .list-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .list-header { padding: 1rem 1.5rem; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+  .list-header.fixed { background: var(--red); } .list-header.variable { background: var(--orange); }
+  .list-total { font-size: 0.85rem; font-weight: 600; opacity: 0.9; }
+
+  .expense-item { display: grid; grid-template-columns: 60px 1fr auto auto; gap: 0.5rem; align-items: center; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+  .expense-item:last-child { border-bottom: none; }
+  .expense-date { font-size: 0.75rem; color: var(--muted); background: var(--surface2); border-radius: 6px; padding: 2px 6px; text-align: center; font-weight: 500; }
+  .expense-desc { font-size: 0.88rem; }
+  .expense-cat { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
+  .expense-amount { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; text-align: right; }
+  .expense-amount.fixa { color: var(--red); } .expense-amount.variavel { color: var(--orange); }
+  .btn-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 1rem; padding: 2px 4px; border-radius: 4px; transition: color 0.2s; }
+  .btn-del:hover { color: var(--red); }
+  .empty-state { padding: 2rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
+
+  .progress-bar { height: 6px; background: var(--surface2); border-radius: 3px; margin-top: 0.6rem; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .progress-fill.green { background: var(--green); } .progress-fill.red { background: var(--red); }
+
+  @media (max-width: 768px) {
+    .summary { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr 1fr; }
+    .lists { grid-template-columns: 1fr; }
+    .main { padding: 1rem; }
+    header { padding: 1rem; gap: 0.5rem; }
+    .sync-badge span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <span style="color:var(--muted);font-size:0.85rem">Conectando ao Firebase...</span>
+</div>
+
+<header>
+  <div class="logo-icon">📊</div>
+  <h1>Controle <span>Financeiro</span> Mensal</h1>
+  <div class="sync-badge">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLabel">Sincronizado</span>
+  </div>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">‹</button>
+    <span id="monthLabel"></span>
+    <button onclick="changeMonth(1)">›</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="receita-section">
+    <label>💰 RECEITA DO MÊS</label>
+    <div class="form-group" style="flex:1;max-width:220px">
+      <input type="number" id="receitaInput" placeholder="R$ 0,00" step="0.01" min="0"
+        onchange="saveIncome()" style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;color:var(--green)">
+    </div>
+    <span style="color:var(--muted);font-size:0.85rem">Informe sua renda mensal para calcular o saldo</span>
+  </div>
+
+  <div class="summary">
+    <div class="card">
+      <div class="card-label">Receita</div>
+      <div class="card-value green" id="sumReceita">R$ 0,00</div>
+      <div class="card-sub">Renda do mês</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total de Despesas</div>
+      <div class="card-value red" id="sumDespesas">R$ 0,00</div>
+      <div class="card-sub" id="subDespesas">Fixas + Variáveis</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Saldo Atual</div>
+      <div class="card-value orange" id="sumSaldo">R$ 0,00</div>
+      <div class="progress-bar"><div class="progress-fill green" id="progressBar" style="width:0%"></div></div>
+      <div class="card-sub" id="progressLabel">—</div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h2>➕ Adicionar Despesa</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <div class="tipo-toggle">
+          <div class="tipo-btn active-fixed" id="btnFixed" onclick="setTipo('fixa')">🔴 Fixa</div>
+          <div class="tipo-btn" id="btnVar" onclick="setTipo('variavel')">🟠 Variável</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="inputDate">
+      </div>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="inputDesc" placeholder="Ex: Conta de Luz" onkeydown="if(event.key==='Enter')addExpense()">
+      </div>
+      <div class="form-group">
+        <label>Valor (R$)</label>
+        <input type="number" id="inputVal" placeholder="0,00" step="0.01" min="0" onkeydown="if(event.key==='Enter')addExpense()">
+      </div>
+      <button class="btn-add" id="btnAdd" onclick="addExpense()">Adicionar</button>
+    </div>
+    <div style="margin-top:0.8rem">
+      <div class="form-group" style="max-width:300px">
+        <label>Categoria (opcional)</label>
+        <input type="text" id="inputCat" placeholder="Ex: Moradia, Saúde, Lazer...">
+      </div>
+    </div>
+  </div>
+
+  <div class="lists">
+    <div class="list-card">
+      <div class="list-header fixed">🔴 Despesas Fixas <span class="list-total" id="totalFixed">R$ 0,00</span></div>
+      <div id="listFixed"><div class="empty-state">Nenhuma despesa fixa registrada</div></div>
+    </div>
+    <div class="list-card">
+      <div class="list-header variable">🟠 Despesas Variáveis <span class="list-total" id="totalVariable">R$ 0,00</span></div>
+      <div id="listVariable"><div class="empty-state">Nenhuma despesa variável registrada</div></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, query, where }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDAylpRDrEIFij6EVaqX83C__zkaXB1Gr4",
+    authDomain: "controle-financeiro-9d5b4.firebaseapp.com",
+    projectId: "controle-financeiro-9d5b4",
+    storageBucket: "controle-financeiro-9d5b4.firebasestorage.app",
+    messagingSenderId: "978278369753",
+    appId: "1:978278369753:web:e60e77b7d5b625df88b1c8"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const today = new Date();
+  let currentYear = today.getFullYear();
+  let currentMonth = today.getMonth();
+  let selectedTipo = 'fixa';
+  let currentExpenses = [];
+  let unsubscribeListener = null;
+
+  function getMonthKey() { return `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`; }
+
+  function setSyncState(state) {
+    const dot = document.getElementById('syncDot');
+    const label = document.getElementById('syncLabel');
+    if (state === 'ok') { dot.className='sync-dot'; label.textContent='Sincronizado'; }
+    else if (state === 'syncing') { dot.className='sync-dot syncing'; label.textContent='Salvando...'; }
+    else { dot.className='sync-dot error'; label.textContent='Erro de conexão'; }
+  }
+
+  function fmt(v) { return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+  function fmtDate(ds) { const d=new Date(ds+'T00:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; }
+
+  function updateUI() {
+    const income = parseFloat(document.getElementById('receitaInput').value) || 0;
+    const fixed = currentExpenses.filter(e => e.tipo==='fixa');
+    const variable = currentExpenses.filter(e => e.tipo==='variavel');
+    const totalFixed = fixed.reduce((s,e)=>s+e.val,0);
+    const totalVar = variable.reduce((s,e)=>s+e.val,0);
+    const total = totalFixed + totalVar;
+    const saldo = income - total;
+    const pct = income > 0 ? Math.min(100, (saldo/income)*100) : 0;
+
+    document.getElementById('sumReceita').textContent = fmt(income);
+    document.getElementById('sumDespesas').textContent = fmt(total);
+    document.getElementById('subDespesas').textContent = `Fixas: ${fmt(totalFixed)} | Variáveis: ${fmt(totalVar)}`;
+    document.getElementById('sumSaldo').textContent = fmt(saldo);
+    document.getElementById('sumSaldo').className = 'card-value ' + (saldo >= 0 ? 'green' : 'red');
+    const bar = document.getElementById('progressBar');
+    bar.style.width = Math.max(0,pct) + '%';
+    bar.className = 'progress-fill ' + (saldo >= 0 ? 'green' : 'red');
+    document.getElementById('progressLabel').textContent = income > 0 ? `${Math.round(pct)}% do salário disponível` : 'Informe a receita';
+    document.getElementById('totalFixed').textContent = fmt(totalFixed);
+    document.getElementById('totalVariable').textContent = fmt(totalVar);
+
+    function renderList(items, tipo, cid) {
+      const c = document.getElementById(cid);
+      if (!items.length) { c.innerHTML=`<div class="empty-state">Nenhuma despesa ${tipo==='fixa'?'fixa':'variável'} registrada</div>`; return; }
+      const sorted = [...items].sort((a,b)=>a.date.localeCompare(b.date));
+      c.innerHTML = sorted.map(e => `
+        <div class="expense-item">
+          <span class="expense-date">${fmtDate(e.date)}</span>
+          <div><div class="expense-desc">${e.desc}</div>${e.cat?`<div class="expense-cat">${e.cat}</div>`:''}</div>
+          <span class="expense-amount ${e.tipo}">${fmt(e.val)}</span>
+          <button class="btn-del" onclick="window._delExpense('${e.docId}')" title="Remover">✕</button>
+        </div>`).join('');
+    }
+    renderList(fixed,'fixa','listFixed');
+    renderList(variable,'variavel','listVariable');
+  }
+
+  async function loadMonth() {
+    const monthKey = getMonthKey();
+    document.getElementById('monthLabel').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+
+    // Default date
+    if (currentMonth===today.getMonth() && currentYear===today.getFullYear()) {
+      document.getElementById('inputDate').value = today.toISOString().slice(0,10);
+    } else {
+      document.getElementById('inputDate').value = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-01`;
+    }
+
+    // Load income
+    try {
+      const inc = await getDoc(doc(db,'income',monthKey));
+      document.getElementById('receitaInput').value = inc.exists() ? (inc.data().val || '') : '';
+    } catch(e) {}
+
+    // Unsubscribe old listener
+    if (unsubscribeListener) { unsubscribeListener(); unsubscribeListener=null; }
+
+    // Real-time expenses
+    const q = query(collection(db,'expenses'), where('monthKey','==',monthKey));
+    unsubscribeListener = onSnapshot(q, snap => {
+      currentExpenses = snap.docs.map(d => ({...d.data(), docId: d.id}));
+      updateUI();
+      setSyncState('ok');
+    }, () => setSyncState('error'));
+  }
+
+  // Global functions
+  window.setTipo = (t) => {
+    selectedTipo = t;
+    document.getElementById('btnFixed').className = 'tipo-btn' + (t==='fixa' ? ' active-fixed' : '');
+    document.getElementById('btnVar').className = 'tipo-btn' + (t==='variavel' ? ' active-variable' : '');
+  };
+
+  window.changeMonth = (d) => {
+    currentMonth += d;
+    if (currentMonth>11){currentMonth=0;currentYear++;}
+    if (currentMonth<0){currentMonth=11;currentYear--;}
+    loadMonth();
+  };
+
+  window.saveIncome = async () => {
+    const val = parseFloat(document.getElementById('receitaInput').value) || 0;
+    setSyncState('syncing');
+    try { await setDoc(doc(db,'income',getMonthKey()), {val, monthKey:getMonthKey()}); setSyncState('ok'); updateUI(); }
+    catch(e) { setSyncState('error'); }
+  };
+
+  window.addExpense = async () => {
+    const date = document.getElementById('inputDate').value;
+    const desc = document.getElementById('inputDesc').value.trim();
+    const val = parseFloat(document.getElementById('inputVal').value);
+    const cat = document.getElementById('inputCat').value.trim();
+    if (!date||!desc||isNaN(val)||val<=0) { alert('Preencha a data, descrição e valor corretamente.'); return; }
+
+    const btn = document.getElementById('btnAdd');
+    btn.disabled = true; setSyncState('syncing');
+    try {
+      const id = Date.now().toString();
+      const monthKey = getMonthKey();
+      // Check if date belongs to a different month and use that month's key
+      const d = new Date(date+'T00:00:00');
+      const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      await setDoc(doc(db,'expenses',`${mk}_${id}`), {id, tipo:selectedTipo, date, desc, val, cat, monthKey:mk});
+      document.getElementById('inputDesc').value='';
+      document.getElementById('inputVal').value='';
+      document.getElementById('inputCat').value='';
+      setSyncState('ok');
+    } catch(e) { setSyncState('error'); alert('Erro ao salvar. Verifique a conexão.'); }
+    btn.disabled = false;
+  };
+
+  window._delExpense = async (docId) => {
+    if (!confirm('Remover esta despesa?')) return;
+    setSyncState('syncing');
+    try { await deleteDoc(doc(db,'expenses',docId)); setSyncState('ok'); }
+    catch(e) { setSyncState('error'); }
+  };
+
+  // Init
+  loadMonth().then(() => {
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.style.display='none', 400);
+  }).catch(() => {
+    document.getElementById('loadingOverlay').innerHTML =
+      '<span style="color:var(--red)">⚠️ Erro ao conectar ao Firebase. Verifique as regras do Firestore.</span>';
+  });
+</script>
+</body>
+</html>
